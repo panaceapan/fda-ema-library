@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FDA + EMA Regulatory Decisions Library</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:10px;color:#202124;background:#fff}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 8px}
+  .head .t{font-size:17px;font-weight:700}
+  .langbtn{display:flex;border:1px solid #dadce0;border-radius:16px;overflow:hidden;flex:0 0 auto}
+  .langbtn button{border:0;background:#fff;padding:6px 13px;font-size:13px;cursor:pointer}
+  .langbtn button.on{background:#1a73e8;color:#fff;font-weight:700}
+  .bar input[type=text]{width:100%;padding:9px 11px;font-size:15px;border:1px solid #dadce0;border-radius:8px;margin-bottom:7px}
+  .row{display:flex;flex-wrap:wrap;gap:6px}
+  .row select{flex:1 1 100px;padding:8px 6px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#fff}
+  .row button{padding:8px 12px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#f8f9fa;cursor:pointer}
+  #count{font-size:13px;color:#5f6368;margin:8px 0 4px}
+  .card{border:1px solid #e8eaed;border-radius:10px;padding:10px 12px;margin:8px 0;background:#fff}
+  .card .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .badge{display:inline-block;padding:1px 8px;border-radius:9px;font-size:11px;color:#fff;line-height:1.7}
+  .b-FDA{background:#1a73e8}.b-EMA{background:#9334e6}
+  .st-approved{background:#188038}.st-unapproved{background:#b3261e}.st-refused{background:#c5221f}.st-withdrawn{background:#5f6368}
+  .date{margin-left:auto;font-size:12px;color:#5f6368}
+  .prod{font-size:15px;font-weight:700;margin:6px 0 1px}
+  .gen{font-size:12.5px;color:#5f6368}
+  .meta{font-size:12.5px;color:#3c4043;margin-top:3px}
+  .ind{font-size:12.5px;color:#5f6368;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .doc{font-size:12px;color:#9334e6;margin-top:2px}
+  .dl{display:block;text-align:center;margin-top:9px;padding:9px;border-radius:8px;background:#1a73e8;color:#fff;font-size:14px;font-weight:700;text-decoration:none}
+  .pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 4px}
+  .pager button{flex:1;padding:11px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#f8f9fa;cursor:pointer}
+  .pager button:disabled{opacity:.4;cursor:default}
+  .pager .pg{flex:0 0 auto;font-size:13px;color:#5f6368;min-width:74px;text-align:center}
+  .sheetlink{display:block;text-align:center;margin:12px 0 2px;font-size:13.5px;color:#1a73e8;text-decoration:none}
+  .empty{padding:22px;text-align:center;color:#5f6368}
+</style>
+</head>
+<body>
+<div class="head">
+  <div class="t" id="title">FDA + EMA 监管决策资料库</div>
+  <div class="langbtn"><button id="lz" class="on">中文</button><button id="le">EN</button></div>
+</div>
+<div class="bar">
+  <input type="text" id="q" placeholder="搜索公司 / 产品 / 申请号…">
+  <div class="row">
+    <select id="fSource"><option value="">来源：全部</option><option>FDA</option><option>EMA</option></select>
+    <select id="fStatus"><option value="">状态：全部</option></select>
+    <select id="fYear"><option value="">年份：全部</option></select>
+    <button id="reset">重置</button>
+  </div>
+</div>
+<div id="count">Loading…</div>
+<div id="list"></div>
+<div class="pager">
+  <button id="prev">← 上一页</button>
+  <div class="pg" id="pginfo"></div>
+  <button id="next">下一页 →</button>
+</div>
+<a class="sheetlink" id="sheetlink" href="https://docs.google.com/spreadsheets/d/166krJYpSWtYJs4NZDYV4etM50y23Twpt3zfeoxYhCxs/edit" target="_blank">📊 在 Google 表格中查看全部</a>
+<script>
+var SHEET_ID = "166krJYpSWtYJs4NZDYV4etM50y23Twpt3zfeoxYhCxs";
+var DATA = [], PER = 12, page = 0, lang = "zh", CUR = [];
+var I = {
+  zh:{title:"FDA + EMA 监管决策资料库",search:"搜索公司 / 产品 / 申请号…",allsrc:"来源：全部",allst:"状态：全部",allyr:"年份：全部",reset:"重置",res:"条结果",of:"共",open:"📄 打开 PDF",none:"没有符合条件的结果",prev:"← 上一页",next:"下一页 →",page:"第",pageof:"页",sheet:"📊 在 Google 表格中查看全部"},
+  en:{title:"FDA + EMA Regulatory Decisions Library",search:"Search company / product / application no…",allsrc:"Source: All",allst:"Status: All",allyr:"Year: All",reset:"Reset",res:"results",of:"total",open:"📄 Open PDF",none:"No matching results",prev:"← Prev",next:"Next →",page:"Page",pageof:"of",sheet:"📊 View all in Google Sheets"}
+};
+function parseCSV(t){
+  var rows=[],row=[],cur="",inq=false;
+  for(var i=0;i<t.length;i++){var ch=t[i];
+    if(inq){ if(ch=='"'){ if(t[i+1]=='"'){cur+='"';i++;} else inq=false; } else cur+=ch; }
+    else if(ch=='"') inq=true;
+    else if(ch==','){ row.push(cur); cur=""; }
+    else if(ch=='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+    else if(ch!='\r') cur+=ch;
+  }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function load(){
+  fetch("https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet=Sheet1")
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      var rows = parseCSV(t); rows.shift();
+      DATA = rows.filter(function(r){ return r.length>=12 && r[0]; }).map(function(r){
+        return {source:r[0],status:r[1],date:r[2],year:r[3],company:r[4],brand:r[5],generic:r[6],app:r[7],ind:r[8],def:r[9],doc:r[10],link:r[11]};
+      });
+      initFilters(); apply(true);
+    })
+    .catch(function(e){ document.getElementById('count').textContent = "Load error: "+e; });
+}
+function uniq(f){ var s={}; DATA.forEach(function(r){ if(r[f]) s[r[f]]=1; }); return Object.keys(s).sort(); }
+function fill(id, vals, label){
+  var el=document.getElementById(id); el.innerHTML="";
+  var o=document.createElement('option'); o.value=""; o.textContent=label; el.appendChild(o);
+  vals.forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); });
+}
+function initFilters(){ fill('fStatus', uniq('status'), I[lang].allst); fill('fYear', uniq('year').reverse(), I[lang].allyr); }
+function filtered(){
+  var q=document.getElementById('q').value.toLowerCase().trim();
+  var so=document.getElementById('fSource').value, st=document.getElementById('fStatus').value, yr=document.getElementById('fYear').value;
+  return DATA.filter(function(r){
+    if(so && r.source!=so) return false;
+    if(st && r.status!=st) return false;
+    if(yr && r.year!=yr) return false;
+    if(q){ var hay=(r.company+" "+r.brand+" "+r.generic+" "+r.app+" "+r.ind).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+    return true;
+  });
+}
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function render(){
+  var html="";
+  CUR.slice(page*PER, page*PER+PER).forEach(function(r){
+    var name = r.brand || r.generic;
+    var gen = r.brand && r.generic ? '<div class="gen">'+esc(r.generic)+'</div>' : '';
+    var meta = [];
+    if(r.company) meta.push(esc(r.company));
+    if(r.app) meta.push(esc(r.app));
+    html += '<div class="card"><div class="top"><span class="badge b-'+r.source+'">'+r.source+'</span>'+
+      '<span class="badge st-'+r.status+'">'+r.status+'</span><span class="date">'+esc(r.date)+'</span></div>'+
+      '<div class="prod">'+esc(name)+'</div>'+gen+
+      (meta.length?'<div class="meta">'+meta.join(' · ')+'</div>':'')+
+      (r.doc?'<div class="doc">'+esc(r.doc)+'</div>':'')+
+      (r.ind && r.ind!=="unknown"?'<div class="ind">'+esc(r.ind)+'</div>':'')+
+      '<a class="dl" href="'+r.link+'" target="_blank">'+I[lang].open+'</a></div>';
+  });
+  document.getElementById('list').innerHTML = html || '<div class="empty">'+I[lang].none+'</div>';
+  var pages = Math.max(1, Math.ceil(CUR.length/PER));
+  document.getElementById('pginfo').textContent = (lang==="zh") ? ("第 "+(page+1)+" / "+pages+" 页") : ("Page "+(page+1)+" of "+pages);
+  document.getElementById('prev').disabled = page<=0;
+  document.getElementById('next').disabled = page>=pages-1;
+}
+function apply(resetPage){
+  if(resetPage) page = 0;
+  CUR = filtered();
+  document.getElementById('count').textContent = CUR.length + " " + I[lang].res + " · " + I[lang].of + " " + DATA.length;
+  render();
+}
+document.getElementById('prev').onclick = function(){ if(page>0){ page--; render(); window.scrollTo(0,0); } };
+document.getElementById('next').onclick = function(){ var pages=Math.ceil(CUR.length/PER); if(page<pages-1){ page++; render(); window.scrollTo(0,0); } };
+['q','fSource','fStatus','fYear'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', function(){ apply(true); });
+  document.getElementById(id).addEventListener('change', function(){ apply(true); });
+});
+document.getElementById('reset').onclick = function(){
+  document.getElementById('q').value=""; document.getElementById('fSource').value=""; document.getElementById('fStatus').value=""; document.getElementById('fYear').value=""; apply(true);
+};
+function setLang(l){
+  lang = l;
+  document.getElementById('lz').className = l=="zh" ? "on" : "";
+  document.getElementById('le').className = l=="en" ? "on" : "";
+  document.getElementById('title').textContent = I[l].title;
+  document.getElementById('q').placeholder = I[l].search;
+  document.getElementById('reset').textContent = I[l].reset;
+  document.getElementById('prev').textContent = I[l].prev;
+  document.getElementById('next').textContent = I[l].next;
+  document.getElementById('sheetlink').textContent = I[l].sheet;
+  document.getElementById('fSource').options[0].textContent = I[l].allsrc;
+  var st=document.getElementById('fStatus'), yv=document.getElementById('fYear');
+  var sv=st.value, yvv=yv.value; initFilters(); st.value=sv; yv.value=yvv;
+  apply(false);
+}
+document.getElementById('lz').onclick = function(){ setLang("zh"); };
+document.getElementById('le').onclick = function(){ setLang("en"); };
+load();
+</script>
+</body>
+</html>

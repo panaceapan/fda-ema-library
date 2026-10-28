@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,8 +13,8 @@
   .langbtn button{border:0;background:#fff;padding:6px 13px;font-size:13px;cursor:pointer}
   .langbtn button.on{background:#1a73e8;color:#fff;font-weight:700}
   .bar input[type=text]{width:100%;padding:9px 11px;font-size:15px;border:1px solid #dadce0;border-radius:8px;margin-bottom:7px}
-  .row{display:flex;flex-wrap:wrap;gap:6px}
-  .row select{flex:1 1 100px;padding:8px 6px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#fff}
+  .row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+  .row select,.row input{flex:1 1 100px;padding:8px 6px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#fff}
   .row button{padding:8px 12px;font-size:14px;border:1px solid #dadce0;border-radius:8px;background:#f8f9fa;cursor:pointer}
   #count{font-size:13px;color:#5f6368;margin:8px 0 4px}
   .card{border:1px solid #e8eaed;border-radius:10px;padding:10px 12px;margin:8px 0;background:#fff}
@@ -39,32 +39,38 @@
 </head>
 <body>
 <div class="head">
-  <div class="t" id="title">FDA + EMA 监管决策资料库</div>
-  <div class="langbtn"><button id="lz" class="on">中文</button><button id="le">EN</button></div>
+  <div class="t" id="title">FDA + EMA Regulatory Decisions Library</div>
+  <div class="langbtn"><button id="lz">中文</button><button id="le" class="on">EN</button></div>
 </div>
 <div class="bar">
-  <input type="text" id="q" placeholder="搜索公司 / 产品 / 申请号…">
+  <input type="text" id="q" placeholder="Search company / product / application no…">
   <div class="row">
-    <select id="fSource"><option value="">来源：全部</option><option>FDA</option><option>EMA</option></select>
-    <select id="fStatus"><option value="">状态：全部</option></select>
-    <select id="fYear"><option value="">年份：全部</option></select>
-    <button id="reset">重置</button>
+    <select id="fSource"><option value="">Source: All</option><option>FDA</option><option>EMA</option></select>
+    <select id="fStatus"><option value="">Status: All</option></select>
+    <select id="fYear"><option value="">Year: All</option></select>
+    <button id="reset">Reset</button>
   </div>
+  <div class="row">
+    <input type="text" id="fCompany" list="dlCompany" placeholder="Company: All">
+    <input type="text" id="fInd" list="dlInd" placeholder="Indication: All">
+  </div>
+  <datalist id="dlCompany"></datalist>
+  <datalist id="dlInd"></datalist>
 </div>
 <div id="count">Loading…</div>
 <div id="list"></div>
 <div class="pager">
-  <button id="prev">← 上一页</button>
+  <button id="prev">← Prev</button>
   <div class="pg" id="pginfo"></div>
-  <button id="next">下一页 →</button>
+  <button id="next">Next →</button>
 </div>
-<a class="sheetlink" id="sheetlink" href="https://docs.google.com/spreadsheets/d/166krJYpSWtYJs4NZDYV4etM50y23Twpt3zfeoxYhCxs/edit" target="_blank">📊 在 Google 表格中查看全部</a>
+<a class="sheetlink" id="sheetlink" href="https://docs.google.com/spreadsheets/d/166krJYpSWtYJs4NZDYV4etM50y23Twpt3zfeoxYhCxs/edit" target="_blank">📊 View all in Google Sheets</a>
 <script>
 var SHEET_ID = "166krJYpSWtYJs4NZDYV4etM50y23Twpt3zfeoxYhCxs";
-var DATA = [], PER = 12, page = 0, lang = "zh", CUR = [];
+var DATA = [], PER = 12, page = 0, lang = "en", CUR = [];
 var I = {
-  zh:{title:"FDA + EMA 监管决策资料库",search:"搜索公司 / 产品 / 申请号…",allsrc:"来源：全部",allst:"状态：全部",allyr:"年份：全部",reset:"重置",res:"条结果",of:"共",open:"📄 打开 PDF",none:"没有符合条件的结果",prev:"← 上一页",next:"下一页 →",page:"第",pageof:"页",sheet:"📊 在 Google 表格中查看全部"},
-  en:{title:"FDA + EMA Regulatory Decisions Library",search:"Search company / product / application no…",allsrc:"Source: All",allst:"Status: All",allyr:"Year: All",reset:"Reset",res:"results",of:"total",open:"📄 Open PDF",none:"No matching results",prev:"← Prev",next:"Next →",page:"Page",pageof:"of",sheet:"📊 View all in Google Sheets"}
+  zh:{title:"FDA + EMA 监管决策资料库",search:"搜索公司 / 产品 / 申请号…",allsrc:"来源：全部",allst:"状态：全部",allyr:"年份：全部",allco:"公司：全部",allind:"适应症：全部",reset:"重置",res:"条结果",of:"共",open:"📄 打开 PDF",none:"没有符合条件的结果",prev:"← 上一页",next:"下一页 →",sheet:"📊 在 Google 表格中查看全部"},
+  en:{title:"FDA + EMA Regulatory Decisions Library",search:"Search company / product / application no…",allsrc:"Source: All",allst:"Status: All",allyr:"Year: All",allco:"Company: All",allind:"Indication: All",reset:"Reset",res:"results",of:"total",open:"📄 Open PDF",none:"No matching results",prev:"← Prev",next:"Next →",sheet:"📊 View all in Google Sheets"}
 };
 function parseCSV(t){
   var rows=[],row=[],cur="",inq=false;
@@ -90,20 +96,33 @@ function load(){
     })
     .catch(function(e){ document.getElementById('count').textContent = "Load error: "+e; });
 }
-function uniq(f){ var s={}; DATA.forEach(function(r){ if(r[f]) s[r[f]]=1; }); return Object.keys(s).sort(); }
+function uniq(f, skipUnknown){ var s={}; DATA.forEach(function(r){ var v=(r[f]||"").trim(); if(v && !(skipUnknown && v.toLowerCase()==="unknown")) s[v]=1; }); return Object.keys(s).sort(); }
 function fill(id, vals, label){
   var el=document.getElementById(id); el.innerHTML="";
   var o=document.createElement('option'); o.value=""; o.textContent=label; el.appendChild(o);
   vals.forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); });
 }
-function initFilters(){ fill('fStatus', uniq('status'), I[lang].allst); fill('fYear', uniq('year').reverse(), I[lang].allyr); }
+function fillList(id, vals){
+  var el=document.getElementById(id); el.innerHTML="";
+  vals.forEach(function(v){ var o=document.createElement('option'); o.value=v; el.appendChild(o); });
+}
+function initFilters(){
+  fill('fStatus', uniq('status'), I[lang].allst);
+  fill('fYear', uniq('year').reverse(), I[lang].allyr);
+  fillList('dlCompany', uniq('company'));
+  fillList('dlInd', uniq('ind', true));
+}
 function filtered(){
   var q=document.getElementById('q').value.toLowerCase().trim();
   var so=document.getElementById('fSource').value, st=document.getElementById('fStatus').value, yr=document.getElementById('fYear').value;
+  var co=document.getElementById('fCompany').value.toLowerCase().trim();
+  var ind=document.getElementById('fInd').value.toLowerCase().trim();
   return DATA.filter(function(r){
     if(so && r.source!=so) return false;
     if(st && r.status!=st) return false;
     if(yr && r.year!=yr) return false;
+    if(co && r.company.toLowerCase().indexOf(co)<0) return false;
+    if(ind && r.ind.toLowerCase().indexOf(ind)<0) return false;
     if(q){ var hay=(r.company+" "+r.brand+" "+r.generic+" "+r.app+" "+r.ind).toLowerCase(); if(hay.indexOf(q)<0) return false; }
     return true;
   });
@@ -139,12 +158,13 @@ function apply(resetPage){
 }
 document.getElementById('prev').onclick = function(){ if(page>0){ page--; render(); window.scrollTo(0,0); } };
 document.getElementById('next').onclick = function(){ var pages=Math.ceil(CUR.length/PER); if(page<pages-1){ page++; render(); window.scrollTo(0,0); } };
-['q','fSource','fStatus','fYear'].forEach(function(id){
+['q','fSource','fStatus','fYear','fCompany','fInd'].forEach(function(id){
   document.getElementById(id).addEventListener('input', function(){ apply(true); });
   document.getElementById(id).addEventListener('change', function(){ apply(true); });
 });
 document.getElementById('reset').onclick = function(){
-  document.getElementById('q').value=""; document.getElementById('fSource').value=""; document.getElementById('fStatus').value=""; document.getElementById('fYear').value=""; apply(true);
+  document.getElementById('q').value=""; document.getElementById('fSource').value=""; document.getElementById('fStatus').value=""; document.getElementById('fYear').value="";
+  document.getElementById('fCompany').value=""; document.getElementById('fInd').value=""; apply(true);
 };
 function setLang(l){
   lang = l;
@@ -157,6 +177,8 @@ function setLang(l){
   document.getElementById('next').textContent = I[l].next;
   document.getElementById('sheetlink').textContent = I[l].sheet;
   document.getElementById('fSource').options[0].textContent = I[l].allsrc;
+  document.getElementById('fCompany').placeholder = I[l].allco;
+  document.getElementById('fInd').placeholder = I[l].allind;
   var st=document.getElementById('fStatus'), yv=document.getElementById('fYear');
   var sv=st.value, yvv=yv.value; initFilters(); st.value=sv; yv.value=yvv;
   apply(false);

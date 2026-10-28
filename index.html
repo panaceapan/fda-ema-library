@@ -6,7 +6,7 @@
 <title>FDA + EMA Regulatory Decisions Library</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:10px;color:#202124;background:#fff}
+  body{font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif;margin:0 auto;padding:10px;color:#202124;background:#fff;max-width:880px}
   .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 8px}
   .head .t{font-size:17px;font-weight:700}
   .langbtn{display:flex;border:1px solid #dadce0;border-radius:16px;overflow:hidden;flex:0 0 auto}
@@ -104,8 +104,8 @@ function fill(id, vals, label, maxLen){
 function initFilters(){
   fill('fStatus', uniq('status'), I[lang].allst);
   fill('fYear', uniq('year').reverse(), I[lang].allyr);
-  fill('fCompany', uniq('company'), I[lang].allco);
-  fill('fInd', uniq('ind', true), I[lang].allind, 70);
+  fill('fCompany', uniq('company'), I[lang].allco, 42);
+  fill('fInd', uniq('ind', true), I[lang].allind, 42);
 }
 function filtered(){
   var q=document.getElementById('q').value.toLowerCase().trim();
